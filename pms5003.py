@@ -16,15 +16,21 @@ import serial
 from time import sleep
 
 # Specify serial port address
-ser_port = "COM38"
+ser_port = "COM37"
 ser = serial.Serial(ser_port, baudrate=9600, stopbits=1, parity="N",  timeout=2)
 
+# Specify delay between data reads in seconds
+data_delay = 1
+
 try:
-    while True:
+    ser.write([66, 77, 225, 0, 0, 1, 112])   # put sensor in passive mode
+    while True:     
         ser.flushInput()
+        ser.write([66, 77, 226, 0, 0, 1, 113])   # ask for data
         s = ser.read(32)
         # Check if data header is correct
         if s[0] == int("42",16) and s[1] == int("4d",16):
+            print("Header is correct")
             cs = (s[30] * 256 + s[31])   # check sum
             # Calculate check sum value
             check = 0
@@ -32,7 +38,18 @@ try:
                 check += s[i]
             # Check if check sum is correct
             if check == cs:
-                # PM1, PM2.5 and PM10 values in ug/m^3
+                # PM1, PM2.5 and PM10 values for standard particle in ug/m^3
+                pm1_hb_std = s[4]
+                pm1_lb_std = s[5]
+                pm1_std = float(pm1_hb_std * 256 + pm1_lb_std)
+                pm25_hb_std = s[6]
+                pm25_lb_std = s[7]
+                pm25_std = float(pm25_hb_std * 256 + pm25_lb_std)
+                pm10_hb_std = s[8]
+                pm10_lb_std = s[9]
+                pm10_std = float(pm10_hb_std * 256 + pm10_lb_std)
+                
+                # PM1, PM2.5 and PM10 values for atmospheric conditions in ug/m^3
                 pm1_hb_atm = s[10]
                 pm1_lb_atm = s[11]
                 pm1_atm = float(pm1_hb_atm * 256 + pm1_lb_atm)
@@ -62,9 +79,14 @@ try:
                 part_10_hb = s[26]
                 part_10_lb = s[27]
                 part_10 = int(part_10_hb * 256 + part_10_lb)
-                
+
+                print("Standard particle:")
+                print("PM1:", pm1_std, "ug/m^3  PM2.5:", pm25_std, "ug/m^3  PM10:", pm10_std, "ug/m^3")
+                print("Atmospheric conditions:")
                 print("PM1:", pm1_atm, "ug/m^3  PM2.5:", pm25_atm, "ug/m^3  PM10:", pm10_atm, "ug/m^3")
+                print("Number of particles:")
                 print(">0.3:", part_03, " >0.5:", part_05, " >1.0:", part_1, " >2.5:", part_25, " >5:", part_5, " >10:", part_10)
+                sleep(data_delay)
 except KeyboardInterrupt:
     ser.close()
     print("Serial port closed")
